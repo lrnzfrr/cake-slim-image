@@ -37,29 +37,36 @@ class CakeSlimImageMiddleware
      */
     public function processRequest(ServerRequestInterface $request) {
 
-        $requestData =  $request->input('json_decode',true);
-        $requestData['slim'] = json_decode($requestData['slim'], true);
-   
+        $requestData =  $this->getData($request);
+  
         if(!$requestData['slim']) {
             return $request;
         }
-       
-        if(isset($requestData['slim'][0])) { // is multi image
-            foreach($requestData['slim'] as $slimImageData) {
-                $requestData['slimImage'][] = $this->processData( $slimImageData);
+ 
+        if($this->isMulti($requestData)) { // is multi image
+            foreach($requestData['slim'] as $currentImgData) {
+                $requestData['slimImage'][] = $this->processData( $currentImgData);
             }
         } else { // single image
             $requestData['slimImage'] = $this->processData( $requestData['slim']);
         }
+
         unset($requestData['slim']);
         $requestData = json_encode($requestData,true);
         $request->setInput($requestData); // deprecated change withBody 
         return  $request;
     }
 
+    /**
+     * processData
+     *  process image data
+     * @param  mixed $slimImageData
+     *
+     * @return imageData
+     */
     private function processData($slimImageData) {
         $slimImageData['output']['image'] =  base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $slimImageData['output']['image']));
-        $filename = '/tmp/' . uniqid() .time();
+        $filename = '/tmp/' . uniqid() .time() .'_'. $slimImageData['output']['name'] ;
 
         file_put_contents($filename, $slimImageData['output']['image']);
      
@@ -69,5 +76,30 @@ class CakeSlimImageMiddleware
         $imageData['type'] = $slimImageData['output']['type'];
         $imageData['size'] = filesize($filename);
         return $imageData;
+    }
+
+    private function getData($request) {
+        $requestData  = $request->input('json_decode',true);
+        if($this->isMulti($requestData)) { // convert to Array
+            $i = 0;
+            foreach($requestData['slim'] as $currentImage) {
+                $requestData['slim'][$i] = json_decode($currentImage['image'], true);
+                $i++;
+            }
+        } else {
+            $requestData['slim'] = json_decode($requestData['slim'],true);
+        }
+        return $requestData;
+    }    
+
+    /**
+     * isMulti
+     *
+     * @param  mixed $requestData
+     * check if the request is multi or single image
+     * @return bool
+     */
+    private function isMulti($requestData) {
+        return (bool) isset($requestData['slim'][0]) && is_array($requestData['slim'][0]) ;
     }
 }
