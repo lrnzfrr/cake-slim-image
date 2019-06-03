@@ -42,18 +42,23 @@ class CakeSlimImageMiddleware
         if(!$requestData['slim']) {
             return $request;
         }
- 
+      
         if($this->isMulti($requestData)) { // is multi image
             foreach($requestData['slim'] as $currentImgData) {
-                $requestData['slimImage'][] = $this->processData( $currentImgData);
+                if( isset($currentImgData['output']) ) {
+                    $requestData['slimImage'][] = $this->processData( $currentImgData);
+                }
+                
             }
         } else { // single image
-            $requestData['slimImage'] = $this->processData( $requestData['slim']);
+            if( isset($requestData['slim']['output']) ) {
+                $requestData['slimImage'] = $this->processData( $requestData['slim']);
+            }
         }
-
         unset($requestData['slim']);
         $requestData = json_encode($requestData,true);
         $request->setInput($requestData); // deprecated change withBody 
+
         return  $request;
     }
 
@@ -65,6 +70,7 @@ class CakeSlimImageMiddleware
      * @return imageData
      */
     private function processData($slimImageData) {
+        
         $slimImageData['output']['image'] =  base64_decode(preg_replace('#^data:image/\w+;base64,#i', '', $slimImageData['output']['image']));
         $filename = '/tmp/' . uniqid() .time() .'_'. $slimImageData['output']['name'] ;
 
@@ -75,6 +81,7 @@ class CakeSlimImageMiddleware
         $imageData['name'] = $slimImageData['output']['name'];
         $imageData['type'] = $slimImageData['output']['type'];
         $imageData['size'] = filesize($filename);
+        $imageData['meta'] = $slimImageData['meta'];
         return $imageData;
     }
 
@@ -83,8 +90,11 @@ class CakeSlimImageMiddleware
         if($this->isMulti($requestData)) { // convert to Array
             $i = 0;
             foreach($requestData['slim'] as $currentImage) {
-                $requestData['slim'][$i] = json_decode($currentImage['image'], true);
-                $i++;
+                if(isset($currentImage['image']) && !empty($currentImage['image']) ) {
+                    $requestData['slim'][$i] = json_decode($currentImage['image'], true);
+                    $i++;
+                }
+
             }
         } else {
             $requestData['slim'] = json_decode($requestData['slim'],true);
